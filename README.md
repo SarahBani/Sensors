@@ -1,41 +1,144 @@
-# The Momo Hiring Challenge
+# Sensors API
 
-This repository contains a simple backend api which could use some improvements. The goal is to test your ability to make changes to code that you could encounter when working at Momo. Below, we have listed some challenges for you to complete. Good luck and have fun!
+A small REST API for managing medical sensors and their recorded values, built with Koa.js and TypeScript.
+
+## Tech Stack
+
+| Technology | Version |
+|---|---|
+| Node.js | ≥ 22 (iterator helpers required) |
+| TypeScript | ^5.7 |
+| Koa | ^2.15 |
+| @koa/router | ^13.1 |
+| @koa/bodyparser | ^5.1 |
+| koa-logger | ^3.2 |
+| Zod | ^3.23 |
+| ts-node | ^10.9 |
+
+## Project Structure
+
+```
+src/
+├── app.ts                          # Koa app entry point
+├── config.ts                       # Environment config (Zod-validated)
+├── database.ts                     # In-memory database
+├── router.ts                       # Route registration
+├── seed.ts                         # Dev seed data
+├── controllers/
+│   ├── _controller.ts              # Controller interface
+│   └── sensors_controller.ts       # Sensor CRUD handlers
+├── repositories/
+│   ├── _repository.ts              # Repository interface
+│   ├── sensors_repository.ts       # Sensor data access
+│   └── sensor_values_repository.ts # Sensor value data access
+└── utils/
+    ├── identifiers.ts              # Auto-increment helper
+    └── types.ts                    # Branded types (Timestamp)
+```
+
+> **Note:** The database is in-memory only — data is lost on restart. The app seeds two sensors and 10 sample values on startup.
 
 ## Getting Started
 
-- Have Node.js >=22 installed.
-- `npm install`
-- `npm start` to start the server.
-- `npm test` to run tests.
+### Install dependencies
 
-## Some Context
+```bash
+npm install
+```
 
-This app concerns itself mostly with two concepts: `Sensors` and `SensorValues`. To keep the challenge focused, their data is simply stored in-memory. For convenience, we already insert some data on server start.
+### Run the server
 
-- `GET http://localhost:1234/sensors` lists all sensors
-- `GET http://localhost:1234/sensors/1` returns a single sensor and includes its sensor values
+```bash
+npm start
+```
 
-## Challenges
+The server starts on port `1234` by default. To use a different port:
 
-### A. Implement a delete method
+```bash
+PORT=3000 npm start
+```
 
-Currently, `SensorValuesRepository.delete` lacks an implementation. Implement this method and show that it actually deletes the sensor value.
+On startup, the available routes are printed to the console:
 
-### B. Validation
+```
+Listening on http://localhost:1234
 
-When updating a sensor, we allow the user to input anything they want into the `Sensor` object! Please add proper validation so this can't happen.
+Routes:
+=> GET,HEAD http://localhost:1234/sensors
+=> POST http://localhost:1234/sensors
+=> GET,HEAD http://localhost:1234/sensors/:id
+=> POST http://localhost:1234/sensors/:id
+=> DELETE http://localhost:1234/sensors/:id
+```
 
-### C. Transformation
+## API Reference
 
-In `SensorsController.read`, we don't want to return the full `SensorValue` objects. Instead we'd like to receive a concise array in the format: `[[timestamp, average of the three values], ...]`. For example, `[[123456789, 2], [123456790, 4]]`.
+### `GET /sensors`
+Returns a list of all sensors.
 
-### D. Something better than "Internal Server Error"
+**Response**
+```json
+[
+  { "id": 1, "name": "BedSense A" },
+  { "id": 2, "name": "BedSense B" }
+]
+```
 
-Sometimes reading can fail, for various reasons! In `SensorsController.read`, make sure that we always return an understandable error response to the client.
+### `GET /sensors/:id`
+Returns a single sensor with its recorded values. Each value entry is `[timestamp, average]` where the average is computed across all simultaneous readings.
 
-### E. A Different Idea
+**Response**
+```json
+{
+  "id": 1,
+  "name": "BedSense A",
+  "values": [
+    [1712000000000, 2.5],
+    [1712000000100, 4.0]
+  ]
+}
+```
 
-We'd like to remove the `id` from `SensorValue` objects completely, and instead use the `timestamp` as identifier for reading/writing. Creating a new `SensorValue` should use the current time.
+**Error responses:** `400` on invalid id, `404` if not found.
 
-Note: The `Repository` interface is currently not fitted to accomodate this, so you will probably need to refactor some of the types there.
+### `POST /sensors`
+Creates a new sensor.
+
+**Request body**
+```json
+{ "name": "BedSense C" }
+```
+
+### `POST /sensors/:id`
+Updates a sensor's name. Whitespace is trimmed; empty/whitespace-only names are rejected.
+
+**Request body**
+```json
+{ "name": "New Name" }
+```
+
+**Error responses:** `400` on invalid input, `404` if not found.
+
+### `DELETE /sensors/:id`
+Deletes a sensor and all its associated values.
+
+**Response:** `204 No Content`
+
+**Error responses:** `400` on invalid id, `404` if not found.
+
+## Running Tests
+
+Tests use Node.js's built-in test runner (`node:test`) — no extra test framework needed.
+
+```bash
+npm test
+```
+
+Test files are co-located with their source files (`*.test.ts`) and cover:
+
+- `sensors_controller.test.ts` — controller-level tests (list, read, update, delete, edge cases)
+- `sensors_repository.test.ts` — repository CRUD operations
+- `sensor_values_repository.test.ts` — sensor value data access
+- `utils/identifiers.test.ts` — auto-increment id utility
+
+Each test suite resets the in-memory database in `beforeEach`, so tests are fully isolated.
